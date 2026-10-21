@@ -29,3 +29,24 @@ def v(x1,x2,x3,delta_t):
     '''calculate the velocity of a particle given its position at three consecutive time steps (x1, x2, x3) and the time step size (delta_t).'''
     return (3*x1 - 4*x2 + x3)/(2*delta_t)
 
+def main(nb_iterations, delta_t, P):
+    '''Main function to simulate the dynamics of a chain of particles in a double-well potential.'''
+    X0 = np.zeros(P)  # Initial positions
+    V0 = np.random.normal(loc=0.0, scale=1.0, size=P) #!TO CHANGE
+    X = [X0]
+    V = [V0]
+    for t in range(nb_iterations):
+        X.append(np.zeros(P))
+        V.append(np.zeros(P))
+        for i in range(P):
+            force = f(X[t], i, V[t][i], delta_t)
+            if t == 0:
+                X[1][i] = X0 + V0 * delta_t + delta_t**2/(2*m)*force
+                V[1][i] = V0 + force * delta_t / m
+            elif t==1:
+                X[2][i] = 2*X[1][i] - X0 + delta_t**2/m*force
+                V[2][i] = V[1][i] + force * delta_t / m
+            else:
+                X[t + 1][i] = 2*X[t][i] - X[t - 1][i] + delta_t**2/m*force
+                V[t + 1][i] = v(X[t][i], X[t-1][i], X[t - 2][i], delta_t)
+    return X, V

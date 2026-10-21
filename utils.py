@@ -30,7 +30,7 @@ def v(x1,x2,x3,delta_t):
     return (3*x1 - 4*x2 + x3)/(2*delta_t)
 
 def main(nb_iterations, delta_t, P):
-    '''Main function to simulate the dynamics of a chain of particles in a double-well potential.'''
+    '''Main function to simulate the dynamics of a chain of P particles in a double-well potential.'''
     X0 = np.zeros(P)  # Initial positions
     V0 = np.random.normal(loc=0.0, scale=1.0, size=P) #!TO CHANGE
     X = [X0]
@@ -50,3 +50,11 @@ def main(nb_iterations, delta_t, P):
                 X[t + 1][i] = 2*X[t][i] - X[t - 1][i] + delta_t**2/m*force
                 V[t + 1][i] = v(X[t][i], X[t-1][i], X[t - 2][i], delta_t)
     return X, V
+
+def energy(X, V):
+    '''Calculate the total energy of the system given the positions (X) and velocities (V) of the particles.'''
+    P = len(X)
+    omega_p = P*kb*T/hbar
+    kinetic_energy = 1/2 * m * np.sum(V**2)- 1/2*m*omega_p**2*np.sum((X[1:]-X[:-1])**2) ##Pas sur de sum ou mean
+    potential_energy = np.mean(V(X))
+    return kinetic_energy , potential_energy

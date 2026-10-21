@@ -13,17 +13,16 @@ kb = c.k
 P = 1   # P replicas to describe the proton
 
 V_0 = hbar**2/(2*m*a**2*C)
+print(f"V_0 = {V_0:.2e} J = {V_0/c.e:.2f} eV")
 T = 0.2*V_0/kb
 w_p = P * kb * T / hbar   # pulsation d'oscillation des ressorts harmoniques
-gamma = w_p # coefficient de friction: peut-être déterminé par calcul à partir de la corrèlation des forces
-
-
-
+w0 = np.sqrt(4*V_0/(m*a**2))  # pulsation d'oscillation dans le puits de potentiel
+gamma = 2*w_p # coefficient de friction: peut-être déterminé par calcul à partir de la correlation des forces
 
 
 # --- Choix du pas de temps ---
-alpha = 1/30    # on prend 30 pas dans la plus petite période d'oscillation (1/100 est idéal)
-dt = alpha * 2*np.pi/w_p
+alpha = 1/100    # on prend 30 pas dans la plus petite période d'oscillation (1/100 est idéal)
+dt = alpha * 2*np.pi/min(w_p, w0)
 
 
 # --- Configurqtion initiale ---
@@ -33,7 +32,6 @@ def vitesse_init():
 
 def pos_init():
     return [0 for _ in range(P)]
-
 
 # --- Fonctions utiles ---
 def V_pot(x):
@@ -59,8 +57,15 @@ def energy(X, V):
     '''Calculate the total energy of the system given the positions (X) and velocities (V) of the particles.'''
     P = len(X)
     omega_p = P*kb*T/hbar
-    kinetic_energy = 1/2 * m * np.sum(V**2)- 1/2*m*omega_p**2*np.sum((X[1:]-X[:-1])**2) ##Pas sur de sum ou mean
-    potential_energy = np.mean(V_pot(X))
+    kinetic_energy = []
+    potential_energy = []
+    for i in range(len(X)):
+        kinetic_energy.append(1/2 * m * np.sum(V[i]**2)- 1/(2*P)*m*omega_p**2*(np.sum((X[i][1:]-X[i][:-1])**2) + (X[i][0]-X[i][-1])**2))
+        potential_energy.append(np.sum(V_pot(X[i])))
+    kinetic_energy = np.array(kinetic_energy)
+    potential_energy = np.array(potential_energy)
+    print(f"kinetic_energy: {kinetic_energy.shape}, potential_energy: {potential_energy.shape}")
+
     return kinetic_energy , potential_energy
 
 
@@ -88,8 +93,9 @@ def main(nb_iterations, delta_t, P):
                 V[t + 1][i] = v(X[t+1][i], X[t][i], X[t - 1][i], delta_t)
     return X, V
 
-
-results = main(100, dt, P)
+print(dt,P)
+results = main(5000, dt, P)
+print(np.array(results[0][0]).shape)
 
 nom_fichier = "resultats.csv"
 # 'newline=""' évite les lignes vides superflues sur Windows

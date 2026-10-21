@@ -1,5 +1,6 @@
 import numpy as np
 import scipy.constants as c
+import matplotlib.pyplot as plt
 
 a = 0.04e-9
 C = 0.8
@@ -21,7 +22,7 @@ def f(X,i,v,delta_t):
 
     omega_p = P*kb*T/hbar
     Ham_part = -dV - m*omega_p**2*(2*X[i]-X[(i-1)%P]-X[(i+1)%P])/(2*a**2)
-    rdm_part = np.sqrt(2*m*gamma*kb*T/delta_t)*np.random.normal()
+    rdm_part = np.sqrt(2*m*gamma*kb*P*T/delta_t)*np.random.normal()
     relax_part = -gamma*m*v
     return Ham_part + rdm_part + relax_part
 
@@ -58,3 +59,42 @@ def energy(X, V):
     kinetic_energy = 1/2 * m * np.sum(V**2)- 1/2*m*omega_p**2*np.sum((X[1:]-X[:-1])**2) ##Pas sur de sum ou mean
     potential_energy = np.mean(V(X))
     return kinetic_energy , potential_energy
+
+def plot_trajectories(X, V, potential, delta_t):
+    """
+    X, V      : tableaux (n_steps, P) -> positions et vitesses de chaque bille à chaque pas
+    potential : fonction V(x)
+    delta_t   : pas de temps (pour l'axe des abscisses ; laisser 1 pour tracer en steps)
+    """
+    n_steps, P = X.shape
+    t = np.arange(n_steps) * delta_t
+    omega_p = P*kb*T/hbar
+
+    # Énergies à chaque pas
+    kinetic_energy , potential_energy = energy(X, V)
+    centroid = X.mean(axis=1)
+
+    fig, axes = plt.subplots(3, 1, figsize=(10, 9), sharex=True)
+
+    # 1) Énergies
+    axes[0].plot(t, kinetic_energy, label="Energy kinetic", lw=0.8)
+    axes[0].plot(t, potential_energy, label="Potential energy $\\langle V \\rangle$", lw=0.8)
+    axes[0].set_ylabel("Energy")
+    axes[0].legend()
+    axes[0].set_title("Energies as a function of time")
+
+    # 2) Toutes les billes
+    for s in range(P):
+        axes[1].plot(t, X[:, s], lw=0.5, alpha=0.6)
+    axes[1].set_ylabel("$x_s$")
+    axes[1].set_title(f"Positions des {P} billes")
+
+    # 3) Centroïde
+    axes[2].plot(t, centroid, color="k", lw=1)
+    axes[2].axhline(0, color="gray", ls="--", lw=0.5)
+    axes[2].set_ylabel("Centroïde $\\bar{x}$")
+    axes[2].set_xlabel("Step" if delta_t == 1.0 else "Temps")
+    axes[2].set_title("Centre du polymère")
+
+    plt.tight_layout()
+    plt.show()

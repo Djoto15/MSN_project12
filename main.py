@@ -48,7 +48,7 @@ class RingPolymerLangevin:
         self.rng = np.random.default_rng(seed)  
         self.w_p = P * kb * T / hbar
         self.w0 = np.sqrt(4 * potential.V0 / (mass * potential.a**2))
-        self.gamma = 2 * self.w_p if gamma is None else gamma
+        self.gamma = 0.1 * self.w_p/(2*np.pi) if gamma is None else gamma
         self.dt = alpha * 2 * np.pi / max(self.w_p, self.w0)
 
         # Constantes pré-calculées
@@ -109,7 +109,7 @@ class RingPolymerLangevin:
         """2e terme de l'estimateur : (1/P) sum_s 1/2 m w_p^2 (x_s - x_{s+1})^2."""
         dX = traj.X - np.roll(traj.X, -1, axis=1)
         return 0.5 * self._k_spring * np.mean(dX**2, axis=1)
-
+    
     def kinetic_energy(self, traj):
         """Estimateur de l'énergie cinétique quantique (Slide 30)."""
         return self.classical_kinetic_energy(traj) - self.spring_energy(traj)
@@ -139,9 +139,11 @@ class RingPolymerLangevin:
         t = traj.t
         fig, axes = plt.subplots(3, 1, figsize=(10, 9), sharex=True)
 
-        axes[0].plot(t, self.kinetic_energy(traj), label="Cinétique", lw=0.8)
-        axes[0].plot(t, self.potential_energy(traj), label="Potentielle", lw=0.8)
-        axes[0].plot(t, self.spring_energy(traj), label="Ressorts", lw=0.8)
+        axes[0].plot(t, self.classical_kinetic_energy(traj)/(0.5*kb*self.P), label="Cinetique classique", lw=0.8)
+        axes[0].plot(t, self.kinetic_energy(traj)/(0.5*kb*self.P), label="Cinetique Quantique", lw=0.8)
+        # axes[0].plot(t, self.potential_energy(traj), label="Potentielle", lw=0.8)
+        # axes[0].plot(t, self.spring_energy(traj), label="Ressorts", lw=0.8)
+        # axes[0].plot(t, self.classical_kinetic_energy(traj)+self.spring_energy(traj)+self.potential_energy(traj), label="total", lw=0.8)
         axes[0].set_ylabel("Énergie (J)")
         axes[0].legend()
         axes[0].set_title("Énergies en fonction du temps")
@@ -167,17 +169,18 @@ class RingPolymerLangevin:
 # --------------------------------------------------------------------------
 # Programme principal
 # --------------------------------------------------------------------------
-def main(n_steps=5000, P=1, seed=None, show=True):
+def main(n_steps=10000, P=200, seed=None, show=True):
     a = 0.04e-9
     C = 0.8
     mass = c.m_p
 
     V0 = hbar**2 / (2 * mass * a**2 * C)
     pot = DoubleWellPotential(V0, a)
-    T = 0.2 * pot.V0 / kb
+    # T = 0.2 * pot.V0 / kb
+    T = 100
     print(f"V_0 = {pot.V0:.2e} J = {pot.V0 / c.e:.2f} eV")
 
-    sim = RingPolymerLangevin(pot, mass, T, P=P, seed=seed)
+    sim = RingPolymerLangevin(pot, mass, T, P=P,gamma=None, seed=seed,alpha = 1/100)
     print(f"dt = {sim.dt:.3e} s, P = {P}")
 
     traj = sim.run(n_steps)

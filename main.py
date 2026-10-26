@@ -39,12 +39,13 @@ class Trajectory:
 
 
 class RingPolymerLangevin:
-    def __init__(self, potential, mass, T, P=1, gamma=None, alpha=1/100,
+    def __init__(self, potential, mass, T, P=1,xc = None, gamma=None, alpha=1/100,
                  seed=None):
         self.pot = potential
         self.m = mass
         self.T = T
         self.P = P
+        self.xc = xc
         self.rng = np.random.default_rng(seed)  
         self.w_p = P * kb * T / hbar
         self.w0 = np.sqrt(4 * potential.V0 / (mass * potential.a**2))
@@ -62,7 +63,9 @@ class RingPolymerLangevin:
         return self.rng.normal(0.0, v_0, size=self.P)   # # tire P vitesses initiales selon une loi normale centrée et de sigma v_0
 
     def pos_init(self):
-        return np.zeros(self.P)
+        if self.xc is None:
+            return np.zeros(self.P)
+        return np.ones(self.P)*self.xc
 
     # --- Forces ---
     def spring_force(self, x):
@@ -83,6 +86,8 @@ class RingPolymerLangevin:
         V = np.empty((n_steps + 1, P))
         X[0] = self.pos_init()
         V[0] = self.vitess_init()
+        if self.xc is not None:
+            V[0] += -np.mean(V[0])
 
         noise = self.rng.standard_normal((n_steps, P))  # tiré en une fois
 
@@ -90,13 +95,20 @@ class RingPolymerLangevin:
         F = self.force(X[0], V[0], noise[0])
         X[1] = X[0] + V[0] * dt + dt**2 / (2 * m) * F
         V[1] = V[0] + F * dt / m
+        # if self.xc is not None:
+        #     X[1] += self.xc - np.mean(X[1])  # on recentre les vitesses si xc est fixé
 
         dt2_m = dt**2 / m
         inv_2dt = 1.0 / (2 * dt)
         for t in range(1, n_steps):
             F = self.force(X[t], V[t], noise[t])
+            mean_F = np.mean(F)
+            if self.xc is not None:
+                F -= mean_F
             X[t + 1] = 2 * X[t] - X[t - 1] + dt2_m * F
-            V[t + 1] = (3 * X[t + 1] - 4 * X[t] + X[t - 1]) * inv_2dt
+            V[t + 1] = (X[t + 1] - X[t - 1]) * inv_2dt
+            # if self.xc is not None:
+            #     X[t + 1] += self.xc - np.mean(X[t + 1])
 
         return Trajectory(t=np.arange(n_steps + 1) * dt, X=X, V=V)
 
@@ -139,13 +151,17 @@ class RingPolymerLangevin:
         t = traj.t
         fig, axes = plt.subplots(3, 1, figsize=(10, 9), sharex=True)
 
-        axes[0].plot(t, self.classical_kinetic_energy(traj)/(0.5*kb*self.P), label="Cinetique classique", lw=0.8)
-        axes[0].plot(t, self.kinetic_energy(traj)/(0.5*kb*self.P), label="Cinetique Quantique", lw=0.8)
-        # axes[0].plot(t, self.potential_energy(traj), label="Potentielle", lw=0.8)
+        # axes[0].plot(t, self.classical_kinetic_energy(traj)/(0.5*kb*self.P), label="Cinetique classique", lw=0.8)
+        # axes[0].plot(t, self.spring_energy(traj)/(0.5*kb*self.P), label="Spring", lw=0.8)
+        axes[0].plot(t, self.potential_energy(traj)/(0.5*kb), label="Potentielle", lw=0.8)
+        # axes[0].plot(t, self.kinetic_energy(traj)/(0.5*kb), label="Cinetique Q", lw=0.8)
+        print(f"Energie potentielle: {np.mean(self.potential_energy(traj)/(0.5*kb))}")
+        print(f"Energie cinetique quantique: {np.mean(self.kinetic_energy(traj)/(0.5*kb))}")
         # axes[0].plot(t, self.spring_energy(traj), label="Ressorts", lw=0.8)
         # axes[0].plot(t, self.classical_kinetic_energy(traj)+self.spring_energy(traj)+self.potential_energy(traj), label="total", lw=0.8)
-        axes[0].set_ylabel("Énergie (J)")
+        axes[0].set_ylabel("Énergie (K)")
         axes[0].legend()
+        axes[0].grid(True, alpha=0.3)
         axes[0].set_title("Énergies en fonction du temps")
 
         axes[1].plot(t, traj.X, lw=0.5, alpha=0.6)
@@ -169,7 +185,7 @@ class RingPolymerLangevin:
 # --------------------------------------------------------------------------
 # Programme principal
 # --------------------------------------------------------------------------
-def main(n_steps=10000, P=200, seed=None, show=True):
+def main(n_steps=50000, P=200, seed=None, show=True):
     a = 0.04e-9
     C = 0.8
     mass = c.m_p
@@ -179,13 +195,14 @@ def main(n_steps=10000, P=200, seed=None, show=True):
     # T = 0.2 * pot.V0 / kb
     T = 100
     print(f"V_0 = {pot.V0:.2e} J = {pot.V0 / c.e:.2f} eV")
+    print(f"T = {T:.2e} K")
 
-    sim = RingPolymerLangevin(pot, mass, T, P=P,gamma=None, seed=seed,alpha = 1/100)
+    sim = RingPolymerLangevin(pot, mass, T, P=P,xc = None,gamma=None, seed=seed, alpha = 1/100)
     print(f"dt = {sim.dt:.3e} s, P = {P}")
 
     traj = sim.run(n_steps)
     print(f"Fichier sauvegardé : {sim.save_csv(traj)}")
-    sim.plot(traj, filename="trajectoires.png", show=show)
+    sim.plot(traj, filename="trajectoires1.png", show=show)
     return sim, traj
 
 

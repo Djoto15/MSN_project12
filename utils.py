@@ -1,6 +1,5 @@
 from dataclasses import dataclass
 from typing import Optional
-
 import numpy as np
 import scipy.constants as c
 
@@ -91,7 +90,7 @@ class RingPolymerLangevin:
         self.w0 = np.sqrt(4.0 * potential.V0 / (mass * potential.a**2))
 
         # Choix de gamma et du pas de temps dt
-        self.gamma = 0.1 * self.w_p / (2.0 * np.pi) if gamma is None else gamma
+        self.gamma = 0.1 * max(self.w_p, self.w0) / (2.0 * np.pi) if gamma is None else gamma
         self.dt = alpha * 2.0 * np.pi / max(self.w_p, self.w0)
 
         # Constantes pré-calculées
@@ -150,18 +149,20 @@ class RingPolymerLangevin:
         X[1] = X[0] + V[0] * dt + (dt**2 / (2.0 * m)) * F0
         V[1] = V[0] + (F0 * dt) / m
 
+        # Pas suivants
         dt2_m = dt**2 / m
         inv_2dt = 1.0 / (2.0 * dt)
 
-        for t_idx in range(1, n_steps):
-            F = self.force(X[t_idx], V[t_idx], noise[t_idx])
-            fc[t_idx] = -np.mean(self.pot.gradient(X[t_idx]))
+        for t in range(1, n_steps):
+            F_t = self.force(X[t], V[t], noise[t])
+            fc[t] = -np.mean(self.pot.gradient(X[t]))
 
             if self.xc is not None:
-                F -= np.mean(F)
+                F_t -= np.mean(F_t)
 
-            X[t_idx + 1] = 2.0 * X[t_idx] - X[t_idx - 1] + dt2_m * F
-            V[t_idx + 1] = (X[t_idx + 1] - X[t_idx - 1]) * inv_2dt
+            X[t + 1] = 2.0 * X[t] - X[t - 1] + dt2_m * F_t
+            # V[t + 1] = (X[t + 1] - X[t - 1]) * inv_2dt
+            V[t + 1] = (3*X[t + 1] - 4*X[t] + X[t - 1]) * inv_2dt
 
         fc[-1] = -np.mean(self.pot.gradient(X[-1]))
 

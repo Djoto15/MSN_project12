@@ -1,100 +1,202 @@
+from dataclasses import dataclass
+from typing import Optional
+
 import numpy as np
 import scipy.constants as c
-import matplotlib.pyplot as plt
 
-a = 0.04e-9
-C = 0.8
-m = c.m_p
-hbar = c.hbar
 kb = c.k
+hbar = c.hbar
 
-V_0 = C*hbar**2/(2*m*a**2)
-T = 0.2*V_0/kb
-gamma = 1 #! TO BE DEFINED
 
-def V(x):
-    return V_0*((x/a)**2-1)**2
+class DoubleWellPotential:
+    """V(x) = V0 ((x/a)^2 - 1)^2"""
 
-def f(X,i,v,delta_t):
-    '''Calculate the force on the i-th particle in the chain, given the position of the particles (X).'''
-    P = len(X)
-    dV = 4*V_0*(X[i]/a**2)*((X[i]/a)**2-1)
+    def __init__(self, V0: float, a: float):
+        self.V0 = V0
+        self.a = a
 
-    omega_p = P*kb*T/hbar
-    Ham_part = -dV - m*omega_p**2*(2*X[i]-X[(i-1)%P]-X[(i+1)%P])/(2*a**2)
-    rdm_part = np.sqrt(2*m*gamma*kb*P*T/delta_t)*np.random.normal()
-    relax_part = -gamma*m*v
-    return Ham_part + rdm_part + relax_part
+    def energy(self, x: np.ndarray) -> np.ndarray:
+        return self.V0 * ((x / self.a) ** 2 - 1.0) ** 2
 
-def v(x1,x2,x3,delta_t):
-    '''calculate the velocity of a particle given its position at three consecutive time steps (x1, x2, x3) and the time step size (delta_t).'''
-    return (3*x1 - 4*x2 + x3)/(2*delta_t)
+    def gradient(self, x: np.ndarray) -> np.ndarray:
+        return 4.0 * self.V0 * x / self.a**2 * ((x / self.a) ** 2 - 1.0)
 
-def main(nb_iterations, delta_t, P):
-    '''Main function to simulate the dynamics of a chain of P particles in a double-well potential.'''
-    X0 = np.zeros(P)  # Initial positions
-    V0 = np.random.normal(loc=0.0, scale=1.0, size=P) #!TO CHANGE
-    X = [X0]
-    V = [V0]
-    for t in range(nb_iterations):
-        X.append(np.zeros(P))
-        V.append(np.zeros(P))
-        for i in range(P):
-            force = f(X[t], i, V[t][i], delta_t)
-            if t == 0:
-                X[1][i] = X0 + V0 * delta_t + delta_t**2/(2*m)*force
-                V[1][i] = V0 + force * delta_t / m
-            elif t==1:
-                X[2][i] = 2*X[1][i] - X0 + delta_t**2/m*force
-                V[2][i] = V[1][i] + force * delta_t / m
-            else:
-                X[t + 1][i] = 2*X[t][i] - X[t - 1][i] + delta_t**2/m*force
-                V[t + 1][i] = v(X[t][i], X[t-1][i], X[t - 2][i], delta_t)
-    return X, V
 
-def energy(X, V):
-    '''Calculate the total energy of the system given the positions (X) and velocities (V) of the particles.'''
-    P = len(X)
-    omega_p = P*kb*T/hbar
-    kinetic_energy = 1/2 * m * np.sum(V**2)- 1/2*m*omega_p**2*np.sum((X[1:]-X[:-1])**2) ##Pas sur de sum ou mean
-    potential_energy = np.mean(V(X))
-    return kinetic_energy , potential_energy
+@dataclass
+class SimulationResults:
+    """Conteneur stockant l'ensemble des grandeurs simulées et calculées."""
 
-def plot_trajectories(X, V, potential, delta_t):
-    """
-    X, V      : tableaux (n_steps, P) -> positions et vitesses de chaque bille à chaque pas
-    potential : fonction V(x)
-    delta_t   : pas de temps (pour l'axe des abscisses ; laisser 1 pour tracer en steps)
-    """
-    n_steps, P = X.shape
-    t = np.arange(n_steps) * delta_t
-    omega_p = P*kb*T/hbar
+    # Paramètres d'exécution
+    n_steps: int
+    dt: float
+    P: int
+    T: float
 
-    # Énergies à chaque pas
-    kinetic_energy , potential_energy = energy(X, V)
-    centroid = X.mean(axis=1)
+    # Trajectoires brutes
+    t: np.ndarray              # (n_steps + 1,) temps en secondes
+    steps: np.ndarray          # (n_steps + 1,) indices entiers des pas
+    X: np.ndarray              # (n_steps + 1, P) positions des billes (m)
+    V: np.ndarray              # (n_steps + 1, P) vitesses des billes (m/s)
 
-    fig, axes = plt.subplots(3, 1, figsize=(10, 9), sharex=True)
+    # Observables structurales
+    centroid: np.ndarray       # (n_steps + 1,) position du centroïde \bar{x} (m)
+    fc: np.ndarray             # (n_steps + 1,) force moyenne sur le centroïde (N)
 
-    # 1) Énergies
-    axes[0].plot(t, kinetic_energy, label="Energy kinetic", lw=0.8)
-    axes[0].plot(t, potential_energy, label="Potential energy $\\langle V \\rangle$", lw=0.8)
-    axes[0].set_ylabel("Energy")
-    axes[0].legend()
-    axes[0].set_title("Energies as a function of time")
+    # Énergies (en Joules)
+    e_pot: np.ndarray          # (n_steps + 1,) énergie potentielle moyenne (1/P) \sum V(x_s)
+    e_kin_class: np.ndarray    # (n_steps + 1,) énergie cinétique classique (1/P) \sum 1/2 m v_s^2
+    e_spring: np.ndarray       # (n_steps + 1,) énergie des ressorts (1/P) \sum 1/2 m \omega_P^2 \Delta x^2
+    e_kin_quant: np.ndarray    # (n_steps + 1,) énergie cinétique quantique (e_kin_class - e_spring)
+    e_tot_class: np.ndarray    # (n_steps + 1,) énergie mécanique totale classique (e_pot + e_kin_class)
 
-    # 2) Toutes les billes
-    for s in range(P):
-        axes[1].plot(t, X[:, s], lw=0.5, alpha=0.6)
-    axes[1].set_ylabel("$x_s$")
-    axes[1].set_title(f"Positions des {P} billes")
+    # Énergies adimensionnées par (0.5 * k_B) (en Kelvin)
+    @property
+    def e_pot_kelvin(self) -> np.ndarray:
+        return self.e_pot / (0.5 * kb)
 
-    # 3) Centroïde
-    axes[2].plot(t, centroid, color="k", lw=1)
-    axes[2].axhline(0, color="gray", ls="--", lw=0.5)
-    axes[2].set_ylabel("Centroïde $\\bar{x}$")
-    axes[2].set_xlabel("Step" if delta_t == 1.0 else "Temps")
-    axes[2].set_title("Centre du polymère")
+    @property
+    def e_kin_quant_kelvin(self) -> np.ndarray:
+        return self.e_kin_quant / (0.5 * kb)
 
-    plt.tight_layout()
-    plt.show()
+    @property
+    def e_kin_class_kelvin(self) -> np.ndarray:
+        return self.e_kin_class / (0.5 * kb * self.P)
+
+    @property
+    def e_spring_kelvin(self) -> np.ndarray:
+        return self.e_spring / (0.5 * kb * self.P)
+
+
+class RingPolymerLangevin:
+    def __init__(
+        self,
+        potential: DoubleWellPotential,
+        mass: float,
+        T: float,
+        P: int = 1,
+        xc: Optional[float] = None,
+        gamma: Optional[float] = None,
+        alpha: float = 1 / 100,
+        seed: Optional[int] = None,
+    ):
+        self.pot = potential
+        self.m = mass
+        self.T = T
+        self.P = P
+        self.xc = xc
+        self.rng = np.random.default_rng(seed)
+
+        # Pulsation de chaîne RPMD et pulsation harmonique
+        self.w_p = P * kb * T / hbar
+        self.w0 = np.sqrt(4.0 * potential.V0 / (mass * potential.a**2))
+
+        # Choix de gamma et du pas de temps dt
+        self.gamma = 0.1 * self.w_p / (2.0 * np.pi) if gamma is None else gamma
+        self.dt = alpha * 2.0 * np.pi / max(self.w_p, self.w0)
+
+        # Constantes pré-calculées
+        self._noise_amp = (
+            np.sqrt(2.0 * mass * self.gamma * kb * P * T / self.dt)
+            if self.gamma > 0
+            else 0.0
+        )
+        self._k_spring = mass * self.w_p**2
+
+    # --- Configuration initiale ---
+    def vitess_init(self) -> np.ndarray:
+        v_0 = np.sqrt(kb * self.P * self.T / self.m)
+        v = self.rng.normal(0.0, v_0, size=self.P)
+        if self.xc is not None:
+            v -= np.mean(v)  # Vitesse nulle pour le centroïde
+        return v
+
+    def pos_init(self) -> np.ndarray:
+        if self.xc is None:
+            return np.ones(self.P) * self.pot.a
+        return np.ones(self.P) * self.xc
+
+    # --- Forces ---
+    def spring_force(self, x: np.ndarray) -> np.ndarray:
+        if self.P == 1:
+            return np.zeros_like(x)
+        return -self._k_spring * (2.0 * x - np.roll(x, 1) - np.roll(x, -1))
+
+    def force(self, x: np.ndarray, v: np.ndarray, noise: np.ndarray) -> np.ndarray:
+        """Force totale agissant sur les P billes."""
+        return (
+            -self.pot.gradient(x)
+            + self.spring_force(x)
+            + self._noise_amp * noise
+            - self.gamma * self.m * v
+        )
+
+    # --- Intégration Verlet ---
+    def run(self, n_steps: int) -> SimulationResults:
+        P, m, dt = self.P, self.m, self.dt
+        X = np.empty((n_steps + 1, P))
+        V = np.empty((n_steps + 1, P))
+        fc = np.empty(n_steps + 1)
+
+        X[0] = self.pos_init()
+        V[0] = self.vitess_init()
+        noise = self.rng.standard_normal((n_steps, P))
+
+        # Pas t = 0 -> t = 1 (Taylor d'ordre 2)
+        F0 = self.force(X[0], V[0], noise[0])
+        fc[0] = -np.mean(self.pot.gradient(X[0]))
+        if self.xc is not None:
+            F0 -= np.mean(F0)
+
+        X[1] = X[0] + V[0] * dt + (dt**2 / (2.0 * m)) * F0
+        V[1] = V[0] + (F0 * dt) / m
+
+        dt2_m = dt**2 / m
+        inv_2dt = 1.0 / (2.0 * dt)
+
+        for t_idx in range(1, n_steps):
+            F = self.force(X[t_idx], V[t_idx], noise[t_idx])
+            fc[t_idx] = -np.mean(self.pot.gradient(X[t_idx]))
+
+            if self.xc is not None:
+                F -= np.mean(F)
+
+            X[t_idx + 1] = 2.0 * X[t_idx] - X[t_idx - 1] + dt2_m * F
+            V[t_idx + 1] = (X[t_idx + 1] - X[t_idx - 1]) * inv_2dt
+
+        fc[-1] = -np.mean(self.pot.gradient(X[-1]))
+
+        # --- Calcul vectorisé de toutes les observables ---
+        t = np.arange(n_steps + 1) * dt
+        steps = np.arange(n_steps + 1)
+        centroid = np.mean(X, axis=1)
+
+        # Énergies (J)
+        e_pot = np.mean(self.pot.energy(X), axis=1)
+        e_kin_class = 0.5 * m * np.mean(V**2, axis=1)
+
+        if P == 1:
+            e_spring = np.zeros(n_steps + 1)
+        else:
+            dX = X - np.roll(X, -1, axis=1)
+            e_spring = 0.5 * self._k_spring * np.mean(dX**2, axis=1)
+
+        e_kin_quant = e_kin_class - e_spring
+        e_tot_class = e_pot + e_kin_class
+
+        return SimulationResults(
+            n_steps=n_steps,
+            dt=dt,
+            P=P,
+            T=self.T,
+            t=t,
+            steps=steps,
+            X=X,
+            V=V,
+            centroid=centroid,
+            fc=fc,
+            e_pot=e_pot,
+            e_kin_class=e_kin_class,
+            e_spring=e_spring,
+            e_kin_quant=e_kin_quant,
+            e_tot_class=e_tot_class,
+        )

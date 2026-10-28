@@ -1,5 +1,5 @@
 import scipy.constants as c
-from utils_old import DoubleWellPotential, Trajectory, RingPolymerLangevin
+from MSN_project12.old.utils_old import DoubleWellPotential, Trajectory, RingPolymerLangevin
 kb = c.k
 hbar = c.hbar
 

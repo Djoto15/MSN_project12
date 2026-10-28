@@ -164,7 +164,7 @@ class RingPolymerLangevin:
             # V[t + 1] = (X[t + 1] - X[t - 1]) * inv_2dt
             V[t + 1] = (3*X[t + 1] - 4*X[t] + X[t - 1]) * inv_2dt
 
-        fc[-1] = np.mean(self.force(X[-1], V[-1], noise[-1]))
+        fc[-1] = np.mean(self.force(X[-1],V[-1], noise[-1]))
 
         # --- Calcul vectorisé de toutes les observables ---
         t = np.arange(n_steps + 1) * dt

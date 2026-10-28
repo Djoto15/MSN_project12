@@ -142,7 +142,7 @@ class RingPolymerLangevin:
 
         # Pas t = 0 -> t = 1 (Taylor d'ordre 2)
         F0 = self.force(X[0], V[0], noise[0])
-        fc[0] = -np.mean(self.pot.gradient(X[0]))
+        fc[0] = np.mean(F0)
         if self.xc is not None:
             F0 -= np.mean(F0)
 
@@ -155,7 +155,7 @@ class RingPolymerLangevin:
 
         for t in range(1, n_steps):
             F_t = self.force(X[t], V[t], noise[t])
-            fc[t] = -np.mean(self.pot.gradient(X[t]))
+            fc[t] = np.mean(F_t)
 
             if self.xc is not None:
                 F_t -= np.mean(F_t)
@@ -164,7 +164,7 @@ class RingPolymerLangevin:
             # V[t + 1] = (X[t + 1] - X[t - 1]) * inv_2dt
             V[t + 1] = (3*X[t + 1] - 4*X[t] + X[t - 1]) * inv_2dt
 
-        fc[-1] = -np.mean(self.pot.gradient(X[-1]))
+        fc[-1] = np.mean(self.force(X[-1], V[-1], noise[-1]))
 
         # --- Calcul vectorisé de toutes les observables ---
         t = np.arange(n_steps + 1) * dt

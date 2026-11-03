@@ -1,12 +1,3 @@
-"""
-Projet 12 - RPMD sous contrainte dans un système 1D :
-surface d'énergie d'un potentiel en double puits.
-
-Chaque question du sujet correspond à une fonction `question_X()`.
-Pour afficher les graphes d'une question, il suffit de décommenter
-l'appel correspondant tout en bas du fichier (bloc `if __name__ == "__main__"`).
-"""
-
 import matplotlib.pyplot as plt
 import numpy as np
 import scipy.constants as c
@@ -37,7 +28,6 @@ def run_simulation(
     pot = DoubleWellPotential(V0, a)
     T = T_facteur * pot.V0 / kb
 
-    print("--- Configuration ---")
     print(f"V0 = {pot.V0:.2e} J ({pot.V0 / c.e:.2f} eV) | T = {T:.2f} K")
     print(f"P = {P} | n_steps = {n_steps} | alpha = {alpha}")
 
@@ -55,7 +45,7 @@ def run_simulation(
 
     # Exécution de la dynamique
     res = sim.run(n_steps)
-    print("Simulation terminée avec succès.")
+    print("Simulation terminée.")
 
     return sim, res
 
@@ -156,7 +146,7 @@ def question_3(n_steps=100000, C=0.8, T_facteur=0.2):
 def question_4(
     list_P=(1, 2, 4, 8, 16, 32, 64, 128, 256, 512, 1024),
     n_steps=100000,
-    C=0.3,
+    C=0.8,
     T_facteur=0.2,
 ):
     """Évolution de <V>/(kB T) avec le nombre de billes P pour en déduire P optimal."""
@@ -201,7 +191,7 @@ def question_4(
 # =============================================================================
 # Question 5 - Contrainte sur le centroïde
 # =============================================================================
-def question_5(n_steps=100000, P=1024, xc=0.0, C=0.3, T_facteur=0.2):
+def question_5(n_steps=100000, P=1024, xc=0.0, C=0.8, T_facteur=0.2):
     """On impose la position xc du centroïde : il ne doit pas bouger au cours de la dynamique."""
     sim, res = run_simulation(
         n_steps=n_steps, P=P, gamma=None, alpha=1 / 100, xc=xc, C=C, T_facteur=T_facteur, seed=None
@@ -292,17 +282,44 @@ def question_8_potentiel():
 
 
 # =============================================================================
-# Commandes : décommenter la question à afficher
+# MENU
 # =============================================================================
+MENU = {
+    "2": ("Vérification du modèle (P=1, gamma=0)", question_2),
+    "3": ("Vérification du thermostat (P=1, dt et gamma optimaux)", question_3),
+    "4": ("<V> en fonction de P (C=0.3, T=0.2 V0/kB)", question_4),
+    "5": ("Centroïde contraint en x_c", question_5),
+    "6": ("f_c(x_c) et potentiel effectif (C=0.8, T=0.2 V0/kB)", question_6),
+    "7a": ("Q4 avec C=0.3, T=0.2 V0/kB : <V> en fonction de P", question_7_P),
+    "7b": ("Q5 avec C=0.3, T=0.2 V0/kB : centroïde contraint", question_7_centroide),
+    "7c": ("Q6 avec C=0.3, T=0.2 V0/kB : potentiel effectif", question_7_potentiel),
+    "8a": ("Q4 avec C=0.3, T=0.4 V0/kB : <V> en fonction de P", question_8_P),
+    "8b": ("Q5 avec C=0.3, T=0.4 V0/kB : centroïde contraint", question_8_centroide),
+    "8c": ("Q6 avec C=0.3, T=0.4 V0/kB : potentiel effectif", question_8_potentiel),
+}
+
+
+def menu():
+    while True:
+        print("\n" + "=" * 70)
+        print(" Projet 12 - RPMD : potentiel en double puits")
+        print("=" * 70)
+        for cle, (description, _) in MENU.items():
+            print(f"  [{cle:>2}]  Question {cle} - {description}")
+        print("  [ exit]  Quitter")
+        print("-" * 70)
+
+        choix = input("\nQuestion a afficher ? ").strip().lower()
+        if choix in ("exit", ""):
+            break
+        if choix not in MENU:
+            print(f"Choix '{choix}' invalide.")
+            continue
+
+        description, fonction = MENU[choix]
+        print(f"\n>>> Question {choix} : {description}\n")
+        fonction()
+
+
 if __name__ == "__main__":
-    question_2()               # Vérification du modèle (P=1, gamma=0)
-    # question_3()             # Vérification du thermostat (P=1)
-    # question_4()             # <V> en fonction de P
-    # question_5()             # Centroïde contraint
-    # question_6()             # f_c(x_c) et potentiel effectif (C=0.8, T=0.2 V0/kB)
-    # question_7_P()           # Q4 avec C=0.3, T=0.2 V0/kB
-    # question_7_centroide()   # Q5 avec C=0.3, T=0.2 V0/kB
-    # question_7_potentiel()   # Q6 avec C=0.3, T=0.2 V0/kB
-    # question_8_P()           # Q4 avec C=0.3, T=0.4 V0/kB
-    # question_8_centroide()   # Q5 avec C=0.3, T=0.4 V0/kB
-    # question_8_potentiel()   # Q6 avec C=0.3, T=0.4 V0/kB
+    menu()

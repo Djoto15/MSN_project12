@@ -1,8 +1,13 @@
+import os
 import matplotlib.pyplot as plt
 import numpy as np
 import scipy.constants as c
 
 from utils import DoubleWellPotential, RingPolymerLangevin
+
+
+dossier = "figures"
+os.makedirs(dossier, exist_ok=True)  # crée le dossier s'il n'existe pas
 
 kb = c.k
 hbar = c.hbar
@@ -103,7 +108,8 @@ def question_2(n_steps=1000, C=0.8, T_facteur=0.2):
     sim, res = run_simulation(
         n_steps=n_steps, P=1, gamma=0, alpha=1 / 100, xc=None, C=C, T_facteur=T_facteur, seed=None
     )
-    plot_trajectoire(res)
+    fig = plot_trajectoire(res)
+    fig.savefig(os.path.join(dossier, "Q2.png"), dpi=300, bbox_inches="tight")
 
     e_tot = res.e_pot_kelvin + res.e_kin_class_kelvin
     print(f"Dérive relative de l'énergie totale : {(e_tot.max() - e_tot.min()) / np.mean(e_tot):.2e}")
@@ -136,6 +142,7 @@ def question_3(n_steps=100000, C=0.8, T_facteur=0.2):
     ax.set_title("Vérification du thermostat de Langevin : équipartition de l'énergie cinétique")
 
     fig.tight_layout()
+    fig.savefig(os.path.join(dossier, "Q3.png"), dpi=300, bbox_inches="tight")
     print(f"<T_cin> = {t_cumulee[-1]:.2f} K  (consigne T = {sim.T:.2f} K)")
     plt.show()
 
@@ -148,6 +155,7 @@ def question_4(
     n_steps=100000,
     C=0.8,
     T_facteur=0.2,
+    fig_name="Q4.png"
 ):
     """Évolution de <V>/(kB T) avec le nombre de billes P pour en déduire P optimal."""
     list_P = list(list_P)
@@ -185,18 +193,20 @@ def question_4(
 
     ax.legend(frameon=True, facecolor="white", edgecolor="none", fontsize=10)
     fig.tight_layout()
+    fig.savefig(os.path.join(dossier, fig_name), dpi=300, bbox_inches="tight")
     plt.show()
 
 
 # =============================================================================
 # Question 5 - Contrainte sur le centroïde
 # =============================================================================
-def question_5(n_steps=100000, P=1024, xc=0.0, C=0.8, T_facteur=0.2):
+def question_5(n_steps=100000, P=1024, xc=0.0, C=0.8, T_facteur=0.2, fig_name="Q5.png"):
     """On impose la position xc du centroïde : il ne doit pas bouger au cours de la dynamique."""
     sim, res = run_simulation(
         n_steps=n_steps, P=P, gamma=None, alpha=1 / 100, xc=xc, C=C, T_facteur=T_facteur, seed=None
     )
-    plot_trajectoire(res)
+    fig = plot_trajectoire(res)
+    fig.savefig(os.path.join(dossier, fig_name), dpi=300, bbox_inches="tight")
 
     print(f"Centroïde moyenne: {(np.mean(res.centroid) * 1e10):.2e} Angström")
     print(f"Centroïde écart-type: {(np.std(res.centroid) * 1e10):.2e} Angström")
@@ -209,11 +219,12 @@ def question_5(n_steps=100000, P=1024, xc=0.0, C=0.8, T_facteur=0.2):
 # =============================================================================
 def question_6(
     n_xc=20,
-    xc_max=0.1e-9,
+    xc_max=0.05e-9,
     P=512,
     n_steps=100000,
     C=0.8,
     T_facteur=0.2,
+    fig_name="Q6.png"
 ):
     """Calcul de f_c pour différentes valeurs de x_c puis intégration
     pour obtenir le potentiel effectif E_p(x_c) = -∫ f_c dx_c."""
@@ -243,6 +254,7 @@ def question_6(
     axes[1].legend(frameon=True, facecolor="white", edgecolor="none", fontsize=10)
 
     fig.tight_layout()
+    fig.savefig(os.path.join(dossier, fig_name), dpi=300, bbox_inches="tight")
 
     V0 = sim.pot.V0
     barriere = E_p[0] - np.min(E_p)
@@ -255,30 +267,30 @@ def question_6(
 # Question 7 - Reprise de 4 à 6 avec T = 0.2 V0/kB et C = 0.3
 # =============================================================================
 def question_7_P():
-    question_4(C=0.3, T_facteur=0.2)
+    question_4(C=0.3, T_facteur=0.2, fig_name="Q7_4.png")
 
 
 def question_7_centroide():
-    question_5(C=0.3, T_facteur=0.2)
+    question_5(C=0.3, T_facteur=0.2, fig_name="Q7_5.png")
 
 
 def question_7_potentiel():
-    question_6(C=0.3, T_facteur=0.2)
+    question_6(C=0.3, T_facteur=0.2, fig_name="Q7_6.png")
 
 
 # =============================================================================
 # Question 8 - Reprise de 4 à 6 avec T = 0.4 V0/kB et C = 0.3
 # =============================================================================
 def question_8_P():
-    question_4(C=0.3, T_facteur=0.4)
+    question_4(C=0.3, T_facteur=0.4, fig_name="Q8_4.png")
 
 
 def question_8_centroide():
-    question_5(C=0.3, T_facteur=0.4)
+    question_5(C=0.3, T_facteur=0.4, fig_name="Q8_5.png")
 
 
 def question_8_potentiel():
-    question_6(C=0.3, T_facteur=0.4)
+    question_6(C=0.3, T_facteur=0.4, fig_name="Q8_6.png")
 
 
 # =============================================================================

@@ -111,7 +111,7 @@ class RingPolymerLangevin:
 
     def pos_init(self) -> np.ndarray:
         if self.xc is None:
-            return np.ones(self.P) * self.pot.a
+            return np.ones(self.P) * 0
         return np.ones(self.P) * self.xc
 
     # --- Forces ---

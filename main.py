@@ -55,7 +55,7 @@ def run_simulation(
     return sim, res
 
 
-def plot_trajectoire(res,dx = 1e-13, distributions = True):
+def plot_trajectoire(res,dx = 0.01, distributions = True):
     """Énergies, positions des billes et centroïde en fonction du temps."""
     fig, axes = plt.subplots(3, 1, figsize=(10, 9), sharex=False)
 
@@ -68,21 +68,22 @@ def plot_trajectoire(res,dx = 1e-13, distributions = True):
     axes[0].set_title("Énergies en fonction du temps")
 
     if distributions:
-        xmax = np.ceil(np.max(np.abs(res.X)) / dx) * dx
+        a=0.04e-9
+        xmax = np.ceil(np.max(np.abs(res.X/a)) / dx) * dx
         edges = np.arange(-xmax, xmax + dx, dx)
         centers = 0.5 * (edges[:-1] + edges[1:])
         nb = len(centers)
 
-        counts, _ = np.histogram(res.X.ravel(), bins=edges)
+        counts, _ = np.histogram((res.X/a).ravel(), bins=edges)
         density = counts / (counts.sum() * dx) 
 
         axes[1].bar(centers, density, width=dx, align="center")
-        axes[1].set_xlabel("x")
+        axes[1].set_xlabel("x/a")
         axes[1].set_ylabel("densité")
     else:
         axes[1].plot(res.t, res.X, lw=0.5, alpha=0.6)
         axes[1].set_ylabel("$x_s$ (m)")
-        axes[1].set_title(f"Positions des {res.P} beads")
+        axes[1].set_title(f"Positions des {res.P} images")
 
     axes[2].plot(res.t, res.centroid, color="k", lw=1)
     axes[2].axhline(0, color="gray", ls="--", lw=0.5)
@@ -309,7 +310,7 @@ def question_bonus(
             F_c.append(np.mean(res.fc[len(res.fc) // 2:]))  # on prend la moyenne sur la seconde moitié de la trajectoire
             E_p.append(E_p[-1] - F_c[-1] * dX)
         E_p = np.array(E_p[: len(X_c)])
-        
+
         V0 = sim.pot.V0
         a = sim.pot.a
         axes.plot(X_c/a, E_p/V0, label=r"$E_p$"+f" (C={C}, T factor={T_facteur})", **_STYLE_COURBE_BONUS)

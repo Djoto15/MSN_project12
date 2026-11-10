@@ -286,7 +286,7 @@ _STYLE_COURBE_BONUS = dict(
 def question_bonus(
     n_xc=20,
     xc_max=0.05e-9,
-    P=1024,
+    P=512,
     n_steps=200000,
     fig_name="Qbonus.png"
 ):
@@ -296,6 +296,7 @@ def question_bonus(
 
     fig, axes = plt.subplots(1, 1, figsize=(8, 5), dpi=150)
 
+    
     for C, T_facteur in [(0.8, 0.2), (0.3, 0.2), (0.3, 0.4)]:
         X_c = np.linspace(0, xc_max, n_xc)
         dX = X_c[1] - X_c[0]
@@ -305,22 +306,23 @@ def question_bonus(
             sim, res = run_simulation(
                 n_steps=n_steps, P=P, gamma=None, alpha=1 / 100, xc=x_c, C=C, T_facteur=T_facteur, seed=None
             )
-            F_c.append(np.mean(res.fc))
+            F_c.append(np.mean(res.fc[len(res.fc) // 2:]))  # on prend la moyenne sur la seconde moitié de la trajectoire
             E_p.append(E_p[-1] - F_c[-1] * dX)
         E_p = np.array(E_p[: len(X_c)])
-
-        axes.plot(X_c, E_p, label=r"$E_p$"+f" (C={C}, T factor={T_facteur})", **_STYLE_COURBE_BONUS)
-        _style_axe(axes, r"Position centroïde $x_c$ (m)", r"$E_p$ (J)",
-                    r"Potentiel effectif $E_p$ à chaque position $x_c$")
+        
+        V0 = sim.pot.V0
+        a = sim.pot.a
+        axes.plot(X_c/a, E_p/V0, label=r"$E_p$"+f" (C={C}, T factor={T_facteur})", **_STYLE_COURBE_BONUS)
+        _style_axe(axes, r"Position centroïde $x_c/a$", r"$E_p/V_0$",
+                    r"Potentiel effectif réduit $E_p/V_0$ à chaque position $x_c/a$")
         axes.legend(frameon=True, facecolor="white", edgecolor="none", fontsize=10)
 
     fig.tight_layout()
     fig.savefig(os.path.join(dossier, fig_name), dpi=300, bbox_inches="tight")
 
-    V0 = sim.pot.V0
     barriere = E_p[0] - np.min(E_p)
     print(f"Hauteur de barrière effective : {barriere:.3e} J = {barriere / V0:.3f} V0 "
-          f"(x_c du minimum = {X_c[np.argmin(E_p)] * 1e10:.3f} Angström)")
+          f"(x_c du minimum = {X_c[np.argmin(E_p)] * 1e10:.3f} Angström= {X_c[np.argmin(E_p)] / sim.pot.a:.3f} a)")
     plt.show()
 # =============================================================================
 # Question 7 - Reprise de 4 à 6 avec T = 0.2 V0/kB et C = 0.3

@@ -55,9 +55,9 @@ def run_simulation(
     return sim, res
 
 
-def plot_trajectoire(res):
+def plot_trajectoire(res,dx = 1e-13, distributions = True):
     """Énergies, positions des billes et centroïde en fonction du temps."""
-    fig, axes = plt.subplots(3, 1, figsize=(10, 9), sharex=True)
+    fig, axes = plt.subplots(3, 1, figsize=(10, 9), sharex=False)
 
     axes[0].plot(res.t, res.e_kin_class_kelvin, label="Cinétique classique", lw=0.8)
     axes[0].plot(res.t, res.e_pot_kelvin, label="Potentielle", lw=0.8)
@@ -67,9 +67,22 @@ def plot_trajectoire(res):
     axes[0].grid(True, alpha=0.3)
     axes[0].set_title("Énergies en fonction du temps")
 
-    axes[1].plot(res.t, res.X, lw=0.5, alpha=0.6)
-    axes[1].set_ylabel("$x_s$ (m)")
-    axes[1].set_title(f"Positions des {res.P} billes")
+    if distributions:
+        xmax = np.ceil(np.max(np.abs(res.X)) / dx) * dx
+        edges = np.arange(-xmax, xmax + dx, dx)
+        centers = 0.5 * (edges[:-1] + edges[1:])
+        nb = len(centers)
+
+        counts, _ = np.histogram(res.X.ravel(), bins=edges)
+        density = counts / (counts.sum() * dx) 
+
+        axes[1].bar(centers, density, width=dx, align="center")
+        axes[1].set_xlabel("x")
+        axes[1].set_ylabel("densité")
+    else:
+        axes[1].plot(res.t, res.X, lw=0.5, alpha=0.6)
+        axes[1].set_ylabel("$x_s$ (m)")
+        axes[1].set_title(f"Positions des {res.P} beads")
 
     axes[2].plot(res.t, res.centroid, color="k", lw=1)
     axes[2].axhline(0, color="gray", ls="--", lw=0.5)
@@ -152,7 +165,7 @@ def question_3(n_steps=100000, C=0.8, T_facteur=0.2):
 # =============================================================================
 def question_4(
     list_P=(1, 2, 4, 8, 16, 32, 64, 128, 256, 512, 1024),
-    n_steps=100000,
+    n_steps=200000,
     C=0.8,
     T_facteur=0.2,
     fig_name="Q4.png"
@@ -167,7 +180,7 @@ def question_4(
             n_steps=n_steps, P=p, gamma=None, alpha=1 / 100, xc=None, C=C, T_facteur=T_facteur, seed=None
         )
         # On écarte le premier quart de la trajectoire pour moyenner à l'équilibre
-        eq_start = len(res.e_pot) // 4
+        eq_start = len(res.e_pot) // 2
         e_pot_equil = res.e_pot[eq_start:]
         e_pot_mean.append(np.mean(e_pot_equil) / (kb * sim.T))
 
@@ -262,7 +275,53 @@ def question_6(
           f"(x_c du minimum = {X_c[np.argmin(E_p)] * 1e10:.3f} Angström)")
     plt.show()
 
+_STYLE_COURBE_BONUS = dict(
+            marker="o",
+            markersize=7,
+            markerfacecolor="white",
+            markeredgewidth=2,
+            linewidth=2,
+        )
 
+def question_bonus(
+    n_xc=20,
+    xc_max=0.05e-9,
+    P=1024,
+    n_steps=200000,
+    fig_name="Qbonus.png"
+):
+    """Calcul de f_c pour différentes valeurs de x_c puis intégration
+    pour obtenir le potentiel effectif E_p(x_c) = -∫ f_c dx_c."""
+    
+
+    fig, axes = plt.subplots(1, 1, figsize=(8, 5), dpi=150)
+
+    for C, T_facteur in [(0.8, 0.2), (0.3, 0.2), (0.3, 0.4)]:
+        X_c = np.linspace(0, xc_max, n_xc)
+        dX = X_c[1] - X_c[0]
+        F_c = []
+        E_p = [0]
+        for x_c in X_c:
+            sim, res = run_simulation(
+                n_steps=n_steps, P=P, gamma=None, alpha=1 / 100, xc=x_c, C=C, T_facteur=T_facteur, seed=None
+            )
+            F_c.append(np.mean(res.fc))
+            E_p.append(E_p[-1] - F_c[-1] * dX)
+        E_p = np.array(E_p[: len(X_c)])
+
+        axes.plot(X_c, E_p, label=r"$E_p$"+f" (C={C}, T factor={T_facteur})", **_STYLE_COURBE_BONUS)
+        _style_axe(axes, r"Position centroïde $x_c$ (m)", r"$E_p$ (J)",
+                    r"Potentiel effectif $E_p$ à chaque position $x_c$")
+        axes.legend(frameon=True, facecolor="white", edgecolor="none", fontsize=10)
+
+    fig.tight_layout()
+    fig.savefig(os.path.join(dossier, fig_name), dpi=300, bbox_inches="tight")
+
+    V0 = sim.pot.V0
+    barriere = E_p[0] - np.min(E_p)
+    print(f"Hauteur de barrière effective : {barriere:.3e} J = {barriere / V0:.3f} V0 "
+          f"(x_c du minimum = {X_c[np.argmin(E_p)] * 1e10:.3f} Angström)")
+    plt.show()
 # =============================================================================
 # Question 7 - Reprise de 4 à 6 avec T = 0.2 V0/kB et C = 0.3
 # =============================================================================
@@ -308,6 +367,7 @@ MENU = {
     "8a": ("Q4 avec C=0.3, T=0.4 V0/kB : <V> en fonction de P", question_8_P),
     "8b": ("Q5 avec C=0.3, T=0.4 V0/kB : centroïde contraint", question_8_centroide),
     "8c": ("Q6 avec C=0.3, T=0.4 V0/kB : potentiel effectif", question_8_potentiel),
+    "bonus": ("Bonus : comparaison de E_p(x_c) pour différents C et T", question_bonus),
 }
 
 
@@ -318,7 +378,7 @@ def menu():
         print("=" * 70)
         for cle, (description, _) in MENU.items():
             print(f"  [{cle:>2}]  Question {cle} - {description}")
-        print("  [ exit]  Quitter")
+        print("  [exit]  Quitter")
         print("-" * 70)
 
         choix = input("\nQuestion a afficher ? ").strip().lower()
